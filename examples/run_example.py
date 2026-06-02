@@ -30,6 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-open", action="store_true", help="Skip atkOpen when the Java bridge is already connected to ATK.")
     parser.add_argument("--no-save", action="store_true", help="Skip Save commands from the reproduced script.")
     parser.add_argument(
+        "--max-commands",
+        type=int,
+        metavar="N",
+        help="Run only the first N commands for debugging long examples.",
+    )
+    parser.add_argument(
         "--keep-going",
         action="store_true",
         help="Continue after NACK/onError and report failures instead of stopping immediately.",
@@ -58,7 +64,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if example is None:
         parser.error(f"unknown example key: {args.example}")
 
+    if args.max_commands is not None and args.max_commands < 1:
+        parser.error("--max-commands must be greater than 0")
+
     commands = without_save(example.commands) if args.no_save else example.commands
+    if args.max_commands is not None:
+        commands = commands[: args.max_commands]
     print(f"运行案例：{example.key} - {example.title}")
     print(f"来源文档：{example.source_doc}")
     if example.note:
