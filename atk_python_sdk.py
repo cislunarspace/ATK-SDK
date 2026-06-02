@@ -25,35 +25,38 @@ def _post(base_url: str, path: str, payload: Dict[str, Any], timeout: float) -> 
 
 def _detect_ok(events: List[str]) -> Tuple[bool, str]:
     """
-    根据回调事件日志判断命令执行是否成功
+    根据回调事件日志判断命令执行是否成功。
 
-    使用启发式规则分析事件日志：
-    - 若出现 "onError" 或 "NACK"，视为失败
-    - 若 onReceivedEx 返回非零 code，视为失败
-    - 否则视为成功
-
-    :param events: 来自 /atk/connect 接口的事件日志列表
-    :return: (是否成功, 失败原因)；若成功，原因为空字符串
+    Java 服务返回的 events 可能包含历史事件，因此按顺序取最后一个
+    终态 ACK/NACK/code 作为本次判断依据。
     """
-    # 检查是否存在明确的错误信号
-    for line in events:
-        if "onError" in line:
-            return False, "onError in callback"
-        if "NACK" in line:
-            return False, "NACK received"
+    last_status = None
 
-    # 检查 onReceivedEx 的返回码是否为 0
     for line in events:
-        if "onReceivedEx" in line and "code=" in line:
-            try:
-                # 提取 code= 后的第一个整数
-                num = int(line.split("code=", 1)[1].split(None, 1)[0].strip().rstrip(":,;"))
-                if num != 0:
-                    return False, f"onReceivedEx code={num}"
-            except Exception:
-                # 解析失败时不视为错误，继续判断其他行
-                pass
-    return True, ""
+        for part in str(line).splitlines():
+            if "onError" in part:
+                last_status = ("NACK", "onError in callback")
+                continue
+
+            if "onReceivedEx" in part and "code=" in part:
+                try:
+                    num = int(part.split("code=", 1)[1].split(None, 1)[0].strip().rstrip(":,;"))
+                    last_status = ("ACK", "") if num == 0 else ("NACK", f"onReceivedEx code={num}")
+                except Exception:
+                    pass
+                continue
+
+            if "NACK" in part:
+                last_status = ("NACK", "NACK received")
+                continue
+
+            if "ACK" in part:
+                last_status = ("ACK", "")
+
+    if last_status is None:
+        return True, ""
+
+    return last_status[0] == "ACK", last_status[1]
 
 
 # ============== 对外接口函数（简化参数，提升易用性） ==============
@@ -128,7 +131,6 @@ def atkConnect(
             print(reason)
             print(f"命令出现错误：{command} {cmdParam}")
     except Exception as e:
-        success = False
-        events = {}
+        events = [f"onError {e}"]
 
     return events

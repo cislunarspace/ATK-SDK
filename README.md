@@ -2,6 +2,10 @@
 
 在近期的一次卫星轨道机动仿真任务中，我需要为多颗卫星配置轨道机动参数。手动逐一设置过程繁琐且效率低下。为此，我将此前编写的二次开发代码进行了重构，整理出一个通用的 ATK 二次开发类。在开发过程中，我结合使用了自行编写的 Java 二次开发服务与 Python 二次开发包。
 
+## 环境准备
+
+### Windows
+
 在运行本演示程序前，请完成以下准备工作：
 
 1. **安装并注册 ATK**  
@@ -27,6 +31,160 @@
    执行 `Main.py`，程序运行后将自动调用 ATK。以下是 ATK 软件界面及控制台输出的截图：  
    ![alt text](figures/ATK运行截图.png)  
    ![alt text](figures/Console结果.png)
+
+### Ubuntu
+
+本仓库已在以下环境验证通过：
+
+- Ubuntu 24.04.4 LTS
+- OpenJDK 21
+- Python 3.12
+- ATK 4.0.0 Linux 版，安装目录为 `/opt/ATK/ATK-4.0.0`
+- NVIDIA 驱动 595.71.05，OpenGL 4.6
+
+Ubuntu 下不要直接用原始 `ATK.sh` 启动本 SDK 示例。仓库提供了 `launch_atk_ubuntu.sh`，用于补充 ATK Connect 端口参数并修复常见的 `libGL` / OpenGL 加载问题。
+
+#### 1. 安装依赖
+
+```bash
+sudo apt update
+sudo apt install openjdk-21-jdk python3 python3-requests \
+  libgl1 libglx-mesa0 libgl1-mesa-dri mesa-utils libglu1-mesa \
+  libegl1 libopengl0 libx11-6 libxcb1 libxcb-glx0 libxcb-dri2-0 \
+  libxcb-dri3-0 libxcb-present0 libxcb-sync1 libxshmfence1 libdrm2
+```
+
+如果使用 NVIDIA 显卡，建议先确认驱动可用：
+
+```bash
+nvidia-smi
+ldconfig -p | grep -E 'libGLX_nvidia|libnvidia-gl'
+```
+
+#### 2. 启动 ATK
+
+```bash
+cd /home/ouyangjiahong/codes/ATK-SDK
+./launch_atk_ubuntu.sh
+```
+
+该脚本默认执行：
+
+- 使用 `/opt/ATK/ATK-4.0.0` 作为 ATK 安装目录；
+- 设置 ATK Connect 端口为 `6655`；
+- 优先使用 Ubuntu / 显卡驱动提供的系统 OpenGL 库；
+- 保留 ATK 自带 Qt 和运行库路径；
+- 设置 Qt XCB / OpenGL 相关环境变量；
+- 启动前切换工作目录到 ATK 安装目录，避免 `data dir not found`。
+
+可通过环境变量覆盖默认值：
+
+```bash
+ATK_HOME=/opt/ATK/ATK-4.0.0 ATK_PORT=6655 ./launch_atk_ubuntu.sh
+```
+
+如果硬件 OpenGL 仍然不可用，可以尝试软件渲染：
+
+```bash
+ATK_SOFTWARE_GL=1 ./launch_atk_ubuntu.sh
+```
+
+如需诊断 Qt 插件或 OpenGL 加载问题：
+
+```bash
+ATK_DEBUG_GL=1 ./launch_atk_ubuntu.sh
+```
+
+确认 ATK Connect 端口已监听：
+
+```bash
+ss -ltnp | grep ':6655\b'
+```
+
+#### 3. 启动 Java 二次开发服务
+
+另开一个终端：
+
+```bash
+cd /home/ouyangjiahong/codes/ATK-SDK
+bash "java service/start.sh"
+```
+
+确认 HTTP 服务端口已监听：
+
+```bash
+ss -ltnp | grep ':8080\b'
+```
+
+如果提示 `地址已在使用`，说明已有 Java 服务占用 `8080`，可先停止旧进程：
+
+```bash
+pkill -f atk_python_sdk_service.jar
+```
+
+#### 4. 运行 Python 示例
+
+另开一个终端：
+
+```bash
+cd /home/ouyangjiahong/codes/ATK-SDK
+python3 Main.py
+```
+
+成功时可看到类似输出：
+
+```text
+ATK 连接成功！
+新场景 'AccessCalApp' 创建成功
+初始化完成，卫星 ID: 48200
+```
+
+## Ubuntu 故障排查
+
+### `libGL` / OpenGL 错误
+
+如果直接运行 ATK 原始脚本时出现：
+
+```text
+libGL error: image driver extension not found
+libGL error: failed to load driver: nouveau
+libGL error: failed to load driver: swrast
+Unrecognized OpenGL version
+```
+
+请使用本仓库的：
+
+```bash
+./launch_atk_ubuntu.sh
+```
+
+该脚本会优先使用系统 OpenGL / GLVND 库，避免 ATK 自带旧 `libGL.so.1` 与当前系统驱动不匹配。
+
+### 端口冲突
+
+Java 服务默认使用 `8080`，ATK Connect 默认使用 `6655`。如果端口被占用，可检查：
+
+```bash
+ss -ltnp | grep -E ':(6655|8080)\b'
+```
+
+停止相关进程：
+
+```bash
+pkill -f atk_python_sdk_service.jar
+pkill -f '/opt/ATK/ATK-4.0.0/ATK'
+```
+
+### ATK 安装目录不同
+
+如果 ATK 不在 `/opt/ATK/ATK-4.0.0`，运行前设置：
+
+```bash
+export ATK_HOME=/path/to/ATK-4.0.0
+export ATK_EXECUTABLE=/home/ouyangjiahong/codes/ATK-SDK/launch_atk_ubuntu.sh
+```
+
+`funcs.py` 默认会通过 `ATK_EXECUTABLE` 查找启动器；未设置时使用仓库内的 `launch_atk_ubuntu.sh`。
 
 # 注意事项
 

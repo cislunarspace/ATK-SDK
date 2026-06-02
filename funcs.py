@@ -13,7 +13,10 @@ class ATKScenario:
     # 常量定义
     BASE_URL = "http://localhost:8080"
     UTC_OFFSET_HOURS = 8  # 中国标准时间 UTC+8
-    ATK_EXE_PATH = r"D:\Program Files (x86)\ATK\ATK-0826\ATK.exe"
+    ATK_EXE_PATH = os.environ.get(
+        "ATK_EXECUTABLE",
+        os.path.join(os.path.dirname(__file__), "launch_atk_ubuntu.sh")
+    )
 
     def __init__(self) -> None:
         """
@@ -41,7 +44,7 @@ class ATKScenario:
             base = self.BASE_URL
 
         try:
-            atkOpen(base, host, port, 1)
+            atkOpen(base, host, port, 10.0)
             print("ATK 连接成功！")
             return True
         except Exception as e1:
@@ -50,13 +53,13 @@ class ATKScenario:
 
             try:
                 if not os.path.exists(self.ATK_EXE_PATH):
-                    raise FileNotFoundError(f"ATK.exe 未找到: {self.ATK_EXE_PATH}")
+                    raise FileNotFoundError(f"ATK 可执行文件未找到: {self.ATK_EXE_PATH}")
 
                 subprocess.Popen([self.ATK_EXE_PATH], cwd=os.path.dirname(self.ATK_EXE_PATH))
                 print("ATK 进程已启动，等待 8 秒初始化...")
                 time.sleep(8)
 
-                atkOpen(base, host, port, 1)
+                atkOpen(base, host, port, 10.0)
                 print("ATK 连接成功！")
                 return True
             except Exception as e2:
@@ -154,7 +157,7 @@ class ATKScenario:
         base = self.BASE_URL
         sensor_path = f"*/Facility/{facility_name}/Sensor/{sensor_name}"
 
-        atkConnect(base, "New", f"/ {sensor_path}")
+        atkConnect(base, "New", f"/ */Facility/{facility_name}/Sensor {sensor_name}")
         atkConnect(base, "Point", f"{sensor_path} Fixed Euler 121 180 0 0")
         atkConnect(
             base, "Define",
@@ -163,7 +166,7 @@ class ATKScenario:
         )
         atkConnect(
             base, "SetConstraint",
-            f"{sensor_path} Range Min {params['min_range']} Max {params['max_range'] * 1000}"
+            f"{sensor_path} Range Min {params['min_range'] * 1000} Max {params['max_range'] * 1000}"
         )
         atkConnect(base, "Graphics", f"{sensor_path} SetColor {self.color_num}")
         self.color_num += 1
@@ -193,8 +196,17 @@ class ATKScenario:
         base = self.BASE_URL
         sat_path = f"*/Satellite/{sat_id}"
 
-        atkConnect(base, "New", f"/ {sat_path}")
-        atkConnect(base, "SetState", f'{sat_path} TLE "{tle[1]}" "{tle[2]}"')
+        atkConnect(base, "New", f"/ Satellite {sat_id}")
+
+        tle_line_1 = tle[1].rstrip("\r\n")
+        tle_line_2 = tle[2].rstrip("\r\n")
+        if len(tle_line_1) != 69 or len(tle_line_2) != 69:
+            raise ValueError(
+                f"TLE lines must each be 69 characters: "
+                f"line1={len(tle_line_1)}, line2={len(tle_line_2)}"
+            )
+
+        atkConnect(base, "SetState", f'{sat_path} TLE "{tle_line_1}" "{tle_line_2}"')
         atkConnect(base, "Graphics", f"{sat_path} SetColor {self.color_num}")
         self.color_num += 1
         atkConnect(base, "Animate", "* Reset")
