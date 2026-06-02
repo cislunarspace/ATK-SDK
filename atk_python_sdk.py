@@ -23,7 +23,7 @@ def _post(base_url: str, path: str, payload: Dict[str, Any], timeout: float) -> 
     return r
 
 
-def _detect_ok(events: List[str]) -> Tuple[bool, str]:
+def detect_ok(events: List[str]) -> Tuple[bool, str]:
     """
     根据回调事件日志判断命令执行是否成功。
 
@@ -57,6 +57,11 @@ def _detect_ok(events: List[str]) -> Tuple[bool, str]:
         return True, ""
 
     return last_status[0] == "ACK", last_status[1]
+
+
+def _detect_ok(events: List[str]) -> Tuple[bool, str]:
+    """Backward-compatible alias for detect_ok()."""
+    return detect_ok(events)
 
 
 # ============== 对外接口函数（简化参数，提升易用性） ==============

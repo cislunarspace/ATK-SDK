@@ -139,6 +139,43 @@ ATK 连接成功！
 初始化完成，卫星 ID: 48200
 ```
 
+## 复现 atk-doc 二次开发案例
+
+本仓库的 `examples/` 目录复现了 `~/codes/atk-doc/02-案例教程/8-二次开发案例` 中的 Connect 模式案例。Ubuntu 下推荐使用 `run_atk_example_ubuntu.sh` 统一运行案例：它会自动检查 ATK 端口、启动缺失的 ATK 进程，并在每次运行前重启 Java 二次开发服务以清理旧连接状态，用户无需手动处理 Java 服务与 ATK 之间的 socket 状态。
+
+列出可运行案例：
+
+```bash
+cd /home/ouyangjiahong/codes/ATK-SDK
+./run_atk_example_ubuntu.sh --list
+```
+
+运行轻量案例：
+
+```bash
+./run_atk_example_ubuntu.sh simple --no-save
+./run_atk_example_ubuntu.sh access --no-save
+./run_atk_example_ubuntu.sh coverage --no-save
+./run_atk_example_ubuntu.sh huge_constellation --no-save
+```
+
+案例执行完成后 ATK 会保持打开，便于继续查看场景或复现下一个案例。
+
+如需直接调用底层 Python 入口，也可以使用：
+
+```bash
+python3 examples/run_example.py --list
+python3 examples/run_example.py simple --no-save
+```
+
+常用参数：
+
+- `--no-save`：跳过文档脚本中的 `Save` 命令；
+- `--close`：案例运行后关闭 Java 服务与 ATK 的 Connect 连接；
+- `--keep-going`：遇到 `NACK` / `onError` 后继续执行后续命令，并在控制台报告失败。
+
+Astrogator、RPO、接近分析等长案例命令较多，运行时间更长，且可能依赖 ATK 对应功能模块授权。如出现 `NACK`，请根据控制台输出的失败命令对照源文档排查。
+
 ## Ubuntu 故障排查
 
 ### `libGL` / OpenGL 错误
